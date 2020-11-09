@@ -27,12 +27,14 @@ The _type checker_ takes the AST as input and either returns or fails.
 The _interpreter_ takes the AST as input and evaluates it, returning the result.
 
 ```
-                                                            --------------------------
-                                                           |                          |
-                  -------                   --------       |        -------------     v     -------------
-Source code ---> | Lexer | --- Tokens ---> | Parser | --- AST ---> | Typechecker | --- --> | Interpreter |
-                  -------                   --------                -------------    \      -------------
-                                                                                      Fail
+                                                            ------------------------------------
+                                                           |                                    |
+                  -------                   --------       |        -------------               v      -------------
+Source code ---> | Lexer | --- Tokens ---> | Parser | --- AST ---> | Typechecker | --(success)--  --> | Interpreter |
+                  -------                   --------                -------------    \                 -------------
+                                                                                    (fail)
+                                                                                       \
+                                                                                        X
 ```
 
 ```typescript
