@@ -42,10 +42,17 @@ type Term =
   | { tag: "TmLet"; name: string; val: Term; body: Term }
   | {
       tag: "TmAbs";
-      params: { name: string; typeAnn: Type | null }[];
+      params: { name: string; typeAnn: Type }[];
       body: Term;
     }
   | { tag: "TmApp"; func: Term; args: Term[] };
+
+type Type =
+  | { tag: "TyBool" }
+  | { tag: "TyInt" }
+  | { tag: "TyStr" }
+  | { tag: "TyList"; elementType: Type }
+  | { tag: "TyArrow"; paramTypes: Type[]; returnType: Type };
 ```
 
 Notice how this corresponds almost one-to-one with the grammar we defined:
@@ -77,3 +84,63 @@ and
 > Side note: The evaluation semantics of `and` and `or` where the second expression is only evaluated when necessary is also the reason why `and` and `or` cannot be implemented as functions in the standard library. Arguments to functions are all evaluated before the body of the function. More on this when we talk about the interpreter.
 
 This allows us to provide more convenient semantics to the programmer without increasing the complexity of our typechecker or interpreter since they are unaware of `and` and `or` expressions. A less obvious example is that we could also eliminate the `"TmLet"` term since `let` expressions can be translated into an equivalent "TmApp" expression. However, TODO explain why we might choose to not do this
+
+The fact that `Term` refers to itself in its definition is what will make this a tree. For example, we may have a term like:
+
+```
+{
+    tag: "TmApp",
+    func: {
+        tag: "TmAbs",
+        params: [
+            {
+                name: "x",
+                type: { tag: "TyInt" },
+            },
+            {
+                name: "person",
+                type: { tag: "TyStr" },
+            },
+        ],
+        body: {
+            tag: "TmIf",
+            cond: {
+                tag: "TmApp",
+                func: { tag: "TmVar", name: ">" },
+                args: [
+                    { tag: "TmVar", name: "x" },
+                    { tag: "TmInt", val: 0 },
+                ]
+            },
+            then: {
+                tag: "TmApp",
+                func: { tag: "TmVar", name: "string-concat" },
+                args: [
+                    { tag: "TmStr", val: "Hello " },
+                    { tag: "TmVar", name: "person" },
+                ]
+            },
+            else: { tag: "TmStr", val: "Goodbye" },
+        }
+    },
+    args: [
+        { tag: "TmInt", val: 1 },
+        { tag: "TmStr", val: "Kevin" },
+    ]
+}
+```
+
+Can you determine the source code for this AST?
+
+Answer:
+
+```
+((lambda (x:int person:str)
+    (if (> x 0)
+        (string-concat "Hello " person)
+        "Goodbye"))
+ 1
+ "Kevin")
+```
+
+and this would evaluate to `"Hello Kevin"`, assuming that `>` and `string-concat` are functions defined in the standard library and behave as you would expect.
