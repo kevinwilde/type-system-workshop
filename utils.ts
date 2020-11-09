@@ -58,8 +58,6 @@ export function printValue(v: ReturnType<typeof evaluate>): string {
       return `empty`;
     case "TmCons":
       return `(cons ${printValue(v.car)} ${printValue(v.cdr)})`;
-    case "TmLocation":
-      return `(ref ${printValue(v.val)})`;
     case "TmClosure":
       return `[CLOSURE]`; // TODO ?
     case "TmStdlibFun":

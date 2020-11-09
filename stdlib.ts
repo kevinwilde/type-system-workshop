@@ -79,7 +79,6 @@ const STD_LIB: Record<string, () => StdLibFun> = {
             return { tag: "TmBool", val: y.tag === "TmVoid" };
           case "TmEmpty":
             return { tag: "TmBool", val: y.tag === "TmEmpty" };
-          case "TmLocation":
           case "TmCons":
           case "TmClosure":
           case "TmStdlibFun":

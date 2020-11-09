@@ -15,7 +15,6 @@ export type Value =
   | { tag: "TmVoid" }
   | { tag: "TmEmpty" }
   | { tag: "TmCons"; car: Value; cdr: Value }
-  | { tag: "TmLocation"; val: Value }
   | { tag: "TmClosure"; params: string[]; body: Term; env: Environment }
   | {
     tag: "TmStdlibFun";
