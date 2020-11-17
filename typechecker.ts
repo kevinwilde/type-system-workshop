@@ -6,6 +6,7 @@ export type Type =
   | { tag: "TyBool" }
   | { tag: "TyInt" }
   | { tag: "TyStr" }
+  // | { tag: "TyList"; elementType: Type }
   | { tag: "TyArrow"; paramTypes: Type[]; returnType: Type };
 
 type Context = { name: string; type: Type }[];

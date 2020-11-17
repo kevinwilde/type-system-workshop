@@ -12,11 +12,10 @@ export type Value =
   | { tag: "TmBool"; val: boolean }
   | { tag: "TmInt"; val: number }
   | { tag: "TmStr"; val: string }
+  // | { tag: "TmEmpty" }
+  // | { tag: "TmCons"; car: Value; cdr: Value }
   | { tag: "TmClosure"; params: string[]; body: Term; env: Environment }
-  | {
-    tag: "TmStdlibFun";
-    impl: (...args: Value[]) => Value;
-  };
+  | { tag: "TmStdlibFun"; impl: (...args: Value[]) => Value };
 
 function interpretInEnv(term: Term, env: Environment): Value {
   switch (term.tag) {

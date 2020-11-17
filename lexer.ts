@@ -8,6 +8,7 @@ type Token =
   | { tag: "AND" }
   | { tag: "OR" }
   | { tag: "LAMBDA" }
+  // | { tag: "EMPTY" }
   | { tag: "BOOL"; val: boolean }
   | { tag: "INT"; val: number }
   | { tag: "STR"; val: string }

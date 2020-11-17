@@ -6,6 +6,8 @@ export type Term = (
   | { tag: "TmBool"; val: boolean }
   | { tag: "TmInt"; val: number }
   | { tag: "TmStr"; val: string }
+  // | { tag: "TmEmpty" }
+  // | { tag: "TmCons"; car: Term; cdr: Term }
   | { tag: "TmVar"; name: string }
   | { tag: "TmIf"; cond: Term; then: Term; else: Term }
   | { tag: "TmAbs"; params: { name: string; typeAnn: Type }[]; body: Term }
