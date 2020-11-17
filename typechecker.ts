@@ -1,35 +1,148 @@
 import { Term } from "./parser.ts";
 import { lookupInStdLib } from "./stdlib.ts";
-import {
-  genUniqTypeVar,
-  assertNever,
-} from "./utils.ts";
+import { assertNever, DiscriminateUnion } from "./utils.ts";
 
 export type Type =
   | { tag: "TyBool" }
   | { tag: "TyInt" }
   | { tag: "TyStr" }
-  | { tag: "TyVoid" }
   | { tag: "TyList"; elementType: Type }
   | { tag: "TyArrow"; paramTypes: Type[]; returnType: Type }
-  | { tag: "TyId"; name: symbol };
+  | { tag: "TyVar"; name: string }
+  | { tag: "TyUniv"; typeVars: string[]; resultType: Type };
 
 type Context = { name: string; type: Type }[];
 
-type Constraint = [Type, Type];
-type Constraints = Constraint[];
-
 export function typeCheck(term: Term) {
-  const [type, constraints] = recon([], term);
-  const resultConstraints = unify(constraints);
-  const finalType = applySubst(resultConstraints, type);
-  return finalType;
+  return getTypeOf(term, []);
 }
 
-function getTypeFromContext(
-  ctx: Context,
-  varName: string,
-): Type {
+function getTypeOf(term: Term, ctx: Context): Type {
+  switch (term.tag) {
+    case "TmBool":
+      return { tag: "TyBool" };
+    case "TmInt":
+      return { tag: "TyInt" };
+    case "TmStr":
+      return { tag: "TyStr" };
+    case "TmVar":
+      return getTypeFromContext(ctx, term.name);
+    case "TmIf": {
+      const condType = getTypeOf(term.cond, ctx);
+      if (condType.tag !== "TyBool") {
+        throw new Error(
+          `Expected guard of conditional to be a boolean but got ${condType.tag}`,
+        );
+      }
+      const thenType = getTypeOf(term.then, ctx);
+      const elseType = getTypeOf(term.else, ctx);
+      if (!typesAreEquiv(thenType, elseType, ctx)) {
+        throw new Error(
+          `Expected branches of conditional to be the same type but got ${thenType.tag} and ${elseType.tag}`,
+        );
+      }
+      return thenType;
+    }
+    case "TmEmpty": {
+      return { tag: "TyList", elementType: term.typeAnn };
+    }
+    case "TmCons": {
+      const carType = getTypeOf(term.car, ctx);
+      const cdrType = getTypeOf(term.cdr, ctx);
+      if (!typesAreEquiv(carType, cdrType, ctx)) {
+        throw new Error(
+          `Element type mismatch in list. Got elements of type ${carType.tag} and ${cdrType.tag}`,
+        );
+      }
+      return { tag: "TyList", elementType: carType };
+    }
+    case "TmLet": {
+      return getTypeOf(
+        term.body,
+        [{ name: term.name, type: getTypeOf(term.val, ctx) }].concat(ctx),
+      );
+    }
+    case "TmAbs": {
+      const newBindings = term.params.map((p) => ({
+        name: p.name,
+        type: p.typeAnn,
+      }));
+      return {
+        tag: "TyArrow",
+        paramTypes: newBindings.map((b) => b.type),
+        returnType: getTypeOf(term.body, newBindings.concat(ctx)),
+      };
+    }
+    case "TmApp": {
+      let funcType = getTypeOf(term.func, ctx);
+      if (funcType.tag !== "TyArrow") {
+        throw new Error(`Expected arrow type but got ${funcType.tag}`);
+      }
+      if (term.args.length !== funcType.paramTypes.length) {
+        throw new Error(
+          `arity mismatch: expected ${funcType.paramTypes.length} arguments, but got ${term.args.length}`,
+        );
+      }
+      const argTypes = term.args.map((arg) => getTypeOf(arg, ctx));
+      for (let i = 0; i < argTypes.length; i++) {
+        if (!typesAreEquiv(argTypes[i], funcType.paramTypes[i], ctx)) {
+          throw new Error(
+            `parameter type mismatch: expected type ${
+              funcType.paramTypes[i].tag
+            }, but got ${argTypes[i].tag}`,
+          );
+        }
+      }
+      return funcType.returnType;
+    }
+    case "TmTypeAbs": {
+      const newBindings: Context = term.typeParams.map((tp) => ({
+        name: tp,
+        type: { tag: "TyVar", name: tp },
+      }));
+      return {
+        tag: "TyUniv",
+        typeVars: term.typeParams,
+        resultType: getTypeOf(term.body, newBindings.concat(ctx)),
+      };
+    }
+    case "TmTypeApp": {
+      const bodyType = getTypeOf(term.body, ctx);
+      // // let bod
+      // // if (term.body.tag === "TmVar") {
+      // //   body =
+      // // }
+      // if (term.body.tag !== "TmTypeAbs") {
+      //   throw new Error(`Expected type abstraction but got ${term.body.tag}`);
+      // }
+      // if (term.body.typeParams.length !== term.typeArgs.length) {
+      //   throw new Error(
+      //     `Type param arity mismatch: expected ${term.body.typeParams.length} arguments, but got ${term.typeArgs.length}`,
+      //   );
+      // }
+      if (bodyType.tag !== "TyUniv") {
+        throw new Error(`Expected type abstraction but got ${bodyType.tag}`);
+      }
+      if (bodyType.typeVars.length !== term.typeArgs.length) {
+        throw new Error(
+          `Type param arity mismatch: expected ${bodyType.typeVars.length} arguments, but got ${term.typeArgs.length}`,
+        );
+      }
+      const newBindings: Context = [];
+      for (let i = 0; i < term.typeArgs.length; i++) {
+        newBindings.push(
+          { name: bodyType.typeVars[i], type: term.typeArgs[i] },
+        );
+      }
+      return reduceUnivType(bodyType, newBindings.concat(ctx));
+    }
+    default: {
+      return assertNever(term);
+    }
+  }
+}
+
+function getTypeFromContext(ctx: Context, varName: string): Type {
   const result = ctx.find((binding) => binding.name === varName);
   if (result) return result.type;
   const stdLibResult = lookupInStdLib(varName);
@@ -37,161 +150,15 @@ function getTypeFromContext(
   throw new Error(`Unbound variable: ${varName}`);
 }
 
-function recon(
+function reduceUnivType(
+  type: DiscriminateUnion<Type, "tag", "TyUniv">,
   ctx: Context,
-  term: Term,
-): [Type, Constraints] {
-  switch (term.tag) {
-    case "TmBool": {
-      return [{ tag: "TyBool" }, []];
-    }
-    case "TmInt": {
-      return [{ tag: "TyInt" }, []];
-    }
-    case "TmStr": {
-      return [{ tag: "TyStr" }, []];
-    }
-    case "TmVar": {
-      const tyVar = getTypeFromContext(ctx, term.name);
-      return [tyVar, []];
-    }
-    case "TmEmpty": {
-      return [
-        {
-          tag: "TyList",
-          elementType: { tag: "TyId", name: genUniqTypeVar() },
-        },
-        [],
-      ];
-    }
-    case "TmCons": {
-      // 1 - car
-      // 2 - cdr
-      const [tyT1, constr1] = recon(ctx, term.car);
-      const [tyT2, constr2] = recon(ctx, term.cdr);
-      const newConstraints: Constraints = [
-        [ // car must be element type of cdr
-          { tag: "TyList", elementType: tyT1 },
-          tyT2,
-        ],
-      ];
-      return [
-        { tag: "TyList", elementType: tyT1 },
-        [...newConstraints, ...constr1, ...constr2],
-      ];
-    }
-    case "TmIf": {
-      // 1 - cond
-      // 2 - then
-      // 3 - else
-      const [tyT1, constr1] = recon(ctx, term.cond);
-      const [tyT2, constr2] = recon(ctx, term.then);
-      const [tyT3, constr3] = recon(ctx, term.else);
-      const newConstraints: Constraints = [
-        [{ tag: "TyBool" }, tyT1], // cond must have type bool
-        [tyT2, tyT3], // then and else must have same type
-      ];
-      return [tyT3, [...newConstraints, ...constr1, ...constr2, ...constr3]];
-    }
-    case "TmLet": {
-      // 1 - value
-      // 2 - body
-      const unknownTypeForRecursion: Type = {
-        tag: "TyId",
-        name: genUniqTypeVar(),
-      };
-      const [tyT1, constr1] = recon(
-        [ // Allows recursion by saying this name is in context, with type unknown as of now
-          { name: term.name, type: unknownTypeForRecursion },
-          ...ctx,
-        ],
-        term.val,
-      );
-
-      const [tyT2, constr2] = recon(
-        [{ name: term.name, type: tyT1 }, ...ctx],
-        term.body,
-      );
-
-      return [
-        tyT2,
-        [
-          // Constraint that the unknown type we referenced above, matches the
-          // type determined for the value of the let expression
-          [unknownTypeForRecursion, tyT1],
-          ...constr1,
-          ...constr2,
-        ], // TODO ?
-      ];
-    }
-    case "TmAbs": {
-      // paramTypes
-      // 2 - body
-      const paramsCtx: Context = [];
-      for (const p of term.params) {
-        paramsCtx.push(
-          {
-            name: p.name,
-            type: (p.typeAnn || { tag: "TyId", name: genUniqTypeVar() }),
-          },
-        );
-      }
-      const newCtx = [...paramsCtx, ...ctx];
-      const [tyT2, constr2] = recon(newCtx, term.body);
-      return [
-        {
-          tag: "TyArrow",
-          paramTypes: paramsCtx.map((e) => e.type),
-          returnType: tyT2,
-        },
-        constr2,
-      ];
-    }
-    case "TmApp": {
-      // 1 - func
-      // argTypes
-      const [tyT1, constr1] = recon(ctx, term.func);
-
-      let argTypes = [];
-      let argConstraints = [];
-      for (const arg of term.args) {
-        const [tyT2, constr2] = recon(ctx, arg);
-        argTypes.push(tyT2);
-        argConstraints.push(...constr2);
-      }
-
-      const tyIdSym = genUniqTypeVar();
-      const newConstraint: Constraints[0] = [
-        tyT1,
-        {
-          tag: "TyArrow",
-          paramTypes: argTypes,
-          returnType: { tag: "TyId", name: tyIdSym },
-        },
-      ];
-
-      return [
-        { tag: "TyId", name: tyIdSym },
-        [newConstraint, ...constr1, ...argConstraints],
-      ];
-    }
-    default:
-      return assertNever(term);
-  }
-}
-
-/**
- * @param tyX symbol of type to subsitute
- * @param tyT "known type" of tyX / constraint on tyX
- * @param tyS type to substitute inside of
- */
-function substituteInTy(tyX: symbol, tyT: Type, tyS: Type) {
+): Type {
   function helper(tyS: Type): Type {
     switch (tyS.tag) {
       case "TyBool":
       case "TyInt":
       case "TyStr":
-      case "TyVoid":
         return tyS;
       case "TyList":
         return {
@@ -204,132 +171,57 @@ function substituteInTy(tyX: symbol, tyT: Type, tyS: Type) {
           paramTypes: tyS.paramTypes.map((p) => helper(p)),
           returnType: helper(tyS.returnType),
         };
-      case "TyId": {
-        if (tyS.name === tyX) {
-          return tyT;
+      case "TyVar": {
+        const typeFromCtx = ctx.find((binding) => binding.name === tyS.name);
+        if (typeFromCtx) {
+          return typeFromCtx.type;
         } else {
           return tyS;
         }
+      }
+      case "TyUniv": {
+        console.log("HERE!");
+        // return helper({
+        //   tag: "TyUniv",
+        //   resultType: helper(tyS.resultType),
+        //   typeVars: tyS.typeVars,
+        // });
+        return helper(tyS.resultType);
       }
       default:
         return assertNever(tyS);
     }
   }
-  return helper(tyS);
+  return helper(type.resultType);
 }
 
-function applySubst(constraints: Constraints, tyT: Type) {
-  return constraints.reverse().reduce((tyS, constraint) => {
-    const [tyId, tyC2] = constraint;
-    if (tyId.tag !== "TyId") throw new Error();
-    return substituteInTy(tyId.name, tyC2, tyS);
-  }, tyT);
-}
-
-function substituteInConstr(
-  tyX: symbol,
-  tyT: Type,
-  constraints: Constraints,
-): Constraints {
-  return constraints.map((c) => {
-    const [tyS1, tyS2] = c;
-    return [
-      substituteInTy(tyX, tyT, tyS1),
-      substituteInTy(tyX, tyT, tyS2),
-    ];
-  });
-}
-
-function occursIn(tyX: symbol, tyT: Type) {
-  function helper(tyT: Type): boolean {
-    switch (tyT.tag) {
-      case "TyBool":
-      case "TyInt":
-      case "TyStr":
-      case "TyVoid":
+function typesAreEquiv(t1: Type, t2: Type, ctx: Context): boolean {
+  if (t1.tag === "TyVar" && t2.tag === "TyVar") {
+    return t1.name === t2.name; // TODO doesn't work if names aren't unique
+  } else if (t1.tag === "TyVar") {
+    const typeFromCtx = ctx.filter((item) => item.name === t1.name)[0];
+    if (!typeFromCtx) throw new Error();
+    return typesAreEquiv(typeFromCtx.type, t2, ctx);
+  } else if (t2.tag === "TyVar") {
+    const typeFromCtx = ctx.filter((item) => item.name === t2.name)[0];
+    if (!typeFromCtx) throw new Error();
+    return typesAreEquiv(t1, typeFromCtx.type, ctx);
+  } else if (t1.tag !== t2.tag) {
+    return false;
+  } else if (t1.tag === "TyList" && t2.tag === "TyList") {
+    return typesAreEquiv(t1.elementType, t2.elementType, ctx);
+  } else if (
+    t1.tag === "TyArrow" && t2.tag === "TyArrow" &&
+    t1.paramTypes.length === t2.paramTypes.length
+  ) {
+    for (let i = 0; i < t1.paramTypes.length; i++) {
+      if (!typesAreEquiv(t1.paramTypes[i], t2.paramTypes[i], ctx)) {
         return false;
-      case "TyList":
-        return helper(tyT.elementType);
-      case "TyArrow":
-        return tyT.paramTypes.filter((p) => helper(p)).length > 0 ||
-          helper(tyT.returnType);
-      case "TyId":
-        return tyT.name === tyX;
-      default:
-        return assertNever(tyT);
+      }
+    }
+    if (!typesAreEquiv(t1.returnType, t2.returnType, ctx)) {
+      return false;
     }
   }
-  return helper(tyT);
-}
-
-function unify(constraints: Constraints) {
-  function helper(constraints: Constraints): Constraints {
-    if (constraints.length === 0) {
-      return [];
-    }
-
-    const [tyS, tyT] = constraints[0];
-    const restConstraints = constraints.slice(1);
-    if (tyS.tag === "TyId" && tyT.tag === "TyId" && tyS.name === tyT.name) {
-      return helper(restConstraints);
-    } else if (tyT.tag === "TyId") {
-      if (occursIn(tyT.name, tyS)) {
-        throw new Error(`circular constraints`);
-      }
-      return [
-        ...helper(substituteInConstr(tyT.name, tyS, restConstraints)),
-        [tyT, tyS],
-      ];
-    } else if (tyS.tag === "TyId") {
-      const flippedConstraint: Constraint = [tyT, tyS];
-      return helper([flippedConstraint, ...restConstraints]);
-    } else if (tyS.tag === tyT.tag) {
-      switch (tyS.tag) {
-        case "TyBool":
-        case "TyInt":
-        case "TyStr":
-        case "TyVoid":
-          return helper(restConstraints);
-        case "TyList": {
-          if (tyT.tag !== "TyList") throw new Error();
-          const elementConstraint: Constraints[0] = [
-            tyS.elementType,
-            tyT.elementType,
-          ];
-          return helper([elementConstraint, ...restConstraints]);
-        }
-        case "TyArrow": {
-          if (tyT.tag !== "TyArrow") throw new Error();
-          if (tyS.paramTypes.length !== tyT.paramTypes.length) {
-            throw new Error(
-              `Unsolvable constraints: expected ${tyS.paramTypes.length} arguments but got ${tyT.paramTypes.length}`,
-            );
-          }
-          const paramConstraints: Constraints = [];
-          for (let i = 0; i < tyS.paramTypes.length; i++) {
-            paramConstraints.push([
-              tyS.paramTypes[i],
-              tyT.paramTypes[i],
-            ]);
-          }
-          const returnConstraint: Constraints[0] = [
-            tyS.returnType,
-            tyT.returnType,
-          ];
-          return helper(
-            [...paramConstraints, returnConstraint, ...restConstraints],
-          );
-        }
-        default:
-          return assertNever(tyS);
-      }
-    } else if (tyS.tag !== tyT.tag) {
-      throw new TypeError(
-        `Unsolvable constraints, expected type ${tyS.tag}, but got ${tyT.tag}`,
-      );
-    } else {
-      throw new Error();
-    }
-  }
-  return helper(constraints);
+  return true;
 }

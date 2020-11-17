@@ -1,10 +1,10 @@
 import { Value } from "./interpreter.ts";
 import { Type } from "./typechecker.ts";
-import { DiscriminateUnion, genUniqTypeVar, assertNever } from "./utils.ts";
+import { DiscriminateUnion, assertNever } from "./utils.ts";
 
 type StdLibFun = {
   tag: "TmStdlibFun";
-  type: DiscriminateUnion<Type, "tag", "TyArrow">;
+  type: DiscriminateUnion<Type, "tag", "TyArrow" | "TyUniv">;
   // TODO
   // impl: (...args: Value[]) => Value;
   impl: (...args: any[]) => Value;
@@ -59,13 +59,17 @@ const STD_LIB: Record<string, () => StdLibFun> = {
     ) => ({ tag: "TmInt", val: x.val * y.val }),
   }),
   "=": () => {
-    const paramType: Type = { tag: "TyId", name: genUniqTypeVar() };
+    const paramType: Type = { tag: "TyVar", name: "X" };
     return {
       tag: "TmStdlibFun",
       type: {
-        tag: "TyArrow",
-        paramTypes: [paramType, paramType],
-        returnType: { tag: "TyBool" },
+        tag: "TyUniv",
+        typeVars: ["X"],
+        resultType: {
+          tag: "TyArrow",
+          paramTypes: [paramType, paramType],
+          returnType: { tag: "TyBool" },
+        },
       },
       impl: (x: Value, y: Value) => {
         switch (x.tag) {
@@ -75,8 +79,6 @@ const STD_LIB: Record<string, () => StdLibFun> = {
             if (x.tag !== y.tag) throw new Error();
             return { tag: "TmBool", val: x.val == y.val };
           }
-          case "TmVoid":
-            return { tag: "TmBool", val: y.tag === "TmVoid" };
           case "TmEmpty":
             return { tag: "TmBool", val: y.tag === "TmEmpty" };
           case "TmCons":
@@ -89,6 +91,21 @@ const STD_LIB: Record<string, () => StdLibFun> = {
       },
     };
   },
+  // "string=?": () => {
+  //   const paramType: Type = { tag: "TyStr" };
+  //   return {
+  //     tag: "TmStdlibFun",
+  //     type: {
+  //       tag: "TyArrow",
+  //       paramTypes: [paramType, paramType],
+  //       returnType: { tag: "TyBool" },
+  //     },
+  //     impl: (
+  //       x: DiscriminateUnion<Value, "tag", "TmStr">,
+  //       y: DiscriminateUnion<Value, "tag", "TmStr">,
+  //     ) => ({ tag: "TmBool", val: x.val === y.val }),
+  //   };
+  // },
   "string-length": () => ({
     tag: "TmStdlibFun",
     type: {
@@ -136,14 +153,18 @@ const STD_LIB: Record<string, () => StdLibFun> = {
     ) => ({ tag: "TmStr", val: x.val + y.val }),
   }),
   "cons": () => {
-    const elementType: Type = { tag: "TyId", name: genUniqTypeVar() };
+    const elementType: Type = { tag: "TyVar", name: "X" };
     const listType: Type = { tag: "TyList", elementType };
     return {
       tag: "TmStdlibFun",
       type: {
-        tag: "TyArrow",
-        paramTypes: [elementType, listType],
-        returnType: listType,
+        tag: "TyUniv",
+        typeVars: ["X"],
+        resultType: {
+          tag: "TyArrow",
+          paramTypes: [elementType, listType],
+          returnType: listType,
+        },
       },
       impl: (car: Value, cdr: Value) => ({ tag: "TmCons", car, cdr }),
     };
@@ -151,14 +172,18 @@ const STD_LIB: Record<string, () => StdLibFun> = {
   "empty?": () => ({
     tag: "TmStdlibFun",
     type: {
-      tag: "TyArrow",
-      paramTypes: [
-        ({
-          tag: "TyList",
-          elementType: { tag: "TyId", name: genUniqTypeVar() },
-        }),
-      ],
-      returnType: ({ tag: "TyBool" }),
+      tag: "TyUniv",
+      typeVars: ["X"],
+      resultType: {
+        tag: "TyArrow",
+        paramTypes: [
+          ({
+            tag: "TyList",
+            elementType: { tag: "TyVar", name: "X" },
+          }),
+        ],
+        returnType: ({ tag: "TyBool" }),
+      },
     },
     impl: (
       lst:
@@ -167,13 +192,17 @@ const STD_LIB: Record<string, () => StdLibFun> = {
     ) => ({ tag: "TmBool", val: lst.tag === "TmEmpty" }),
   }),
   "car": () => {
-    const elementType: Type = { tag: "TyId", name: genUniqTypeVar() };
+    const elementType: Type = { tag: "TyVar", name: "X" };
     return {
       tag: "TmStdlibFun",
       type: {
-        tag: "TyArrow",
-        paramTypes: [{ tag: "TyList", elementType }],
-        returnType: elementType,
+        tag: "TyUniv",
+        typeVars: ["X"],
+        resultType: {
+          tag: "TyArrow",
+          paramTypes: [{ tag: "TyList", elementType }],
+          returnType: elementType,
+        },
       },
       impl: (
         lst:
@@ -186,14 +215,18 @@ const STD_LIB: Record<string, () => StdLibFun> = {
     };
   },
   "cdr": () => {
-    const elementType: Type = { tag: "TyId", name: genUniqTypeVar() };
+    const elementType: Type = { tag: "TyVar", name: "X" };
     const listType: Type = { tag: "TyList", elementType };
     return {
       tag: "TmStdlibFun",
       type: {
-        tag: "TyArrow",
-        paramTypes: [listType],
-        returnType: listType,
+        tag: "TyUniv",
+        typeVars: ["X"],
+        resultType: {
+          tag: "TyArrow",
+          paramTypes: [listType],
+          returnType: listType,
+        },
       },
       impl: (
         lst:
@@ -205,6 +238,76 @@ const STD_LIB: Record<string, () => StdLibFun> = {
       },
     };
   },
+  // "cons-str": () => {
+  //   const elementType: Type = { tag: "TyInt" };
+  //   const listType: Type = { tag: "TyList", elementType };
+  //   return {
+  //     tag: "TmStdlibFun",
+  //     type: {
+  //       tag: "TyArrow",
+  //       paramTypes: [elementType, listType],
+  //       returnType: listType,
+  //     },
+  //     impl: (car: Value, cdr: Value) => ({ tag: "TmCons", car, cdr }),
+  //   };
+  // },
+  // "empty?-str": () => ({
+  //   tag: "TmStdlibFun",
+  //   type: {
+  //     tag: "TyArrow",
+  //     paramTypes: [
+  //       ({
+  //         tag: "TyList",
+  //         elementType: { tag: "TyInt" },
+  //       }),
+  //     ],
+  //     returnType: ({ tag: "TyBool" }),
+  //   },
+  //   impl: (
+  //     lst:
+  //       | DiscriminateUnion<Value, "tag", "TmCons">
+  //       | DiscriminateUnion<Value, "tag", "TmEmpty">,
+  //   ) => ({ tag: "TmBool", val: lst.tag === "TmEmpty" }),
+  // }),
+  // "car-str": () => {
+  //   const elementType: Type = { tag: "TyInt" };
+  //   return {
+  //     tag: "TmStdlibFun",
+  //     type: {
+  //       tag: "TyArrow",
+  //       paramTypes: [{ tag: "TyList", elementType }],
+  //       returnType: elementType,
+  //     },
+  //     impl: (
+  //       lst:
+  //         | DiscriminateUnion<Value, "tag", "TmCons">
+  //         | DiscriminateUnion<Value, "tag", "TmEmpty">,
+  //     ) => {
+  //       if (lst.tag === "TmEmpty") throw new Error("Called car on empty list");
+  //       return lst.car;
+  //     },
+  //   };
+  // },
+  // "cdr-str": () => {
+  //   const elementType: Type = { tag: "TyInt" };
+  //   const listType: Type = { tag: "TyList", elementType };
+  //   return {
+  //     tag: "TmStdlibFun",
+  //     type: {
+  //       tag: "TyArrow",
+  //       paramTypes: [listType],
+  //       returnType: listType,
+  //     },
+  //     impl: (
+  //       lst:
+  //         | DiscriminateUnion<Value, "tag", "TmCons">
+  //         | DiscriminateUnion<Value, "tag", "TmEmpty">,
+  //     ) => {
+  //       if (lst.tag === "TmEmpty") throw new Error("Called cdr on empty list");
+  //       return lst.cdr;
+  //     },
+  //   };
+  // },
 };
 
 export function lookupInStdLib(

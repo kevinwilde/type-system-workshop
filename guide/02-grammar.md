@@ -12,7 +12,7 @@ Note: ... signifies zero or more of the item which precedes it
   | <string>
   | <boolean>
   | <id>
-  | empty
+  | empty:<type>
   | (and <expression> <expression>)
   | (or <expression> <expression>)
   | (cons <expression> <expression>)
@@ -47,7 +47,7 @@ Examples:
 
 `x` <- undefined variable
 
-`empty`
+`empty:int`
 
 `(and #t #f)`
 
