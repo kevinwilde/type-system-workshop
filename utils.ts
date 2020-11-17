@@ -52,12 +52,6 @@ export function printValue(v: ReturnType<typeof evaluate>): string {
       return `${v.val}`;
     case "TmStr":
       return `"${v.val}"`;
-    case "TmVoid":
-      return `void`;
-    case "TmEmpty":
-      return `empty`;
-    case "TmCons":
-      return `(cons ${printValue(v.car)} ${printValue(v.cdr)})`;
     case "TmClosure":
       return `[CLOSURE]`; // TODO ?
     case "TmStdlibFun":
@@ -87,7 +81,7 @@ export function printType(t: ReturnType<typeof typeCheck>) {
   };
   const nextFree = nextFreeGenerator();
 
-  const symbolToPrettyType: Map<symbol, string> = new Map();
+  const symbolToPrettyType: Map<unknown, string> = new Map();
 
   function helper(t: ReturnType<typeof typeCheck>): string {
     switch (t.tag) {
@@ -97,20 +91,10 @@ export function printType(t: ReturnType<typeof typeCheck>) {
         return "int";
       case "TyStr":
         return "str";
-      case "TyVoid":
-        return "void";
-      case "TyList":
-        return `(Listof ${helper(t.elementType)})`;
       case "TyArrow":
         return `(-> ${(t.paramTypes.map((p) => helper(p))).join(" ")} ${
           helper(t.returnType)
         })`;
-      case "TyId": {
-        if (!(symbolToPrettyType.has(t.name))) {
-          symbolToPrettyType.set(t.name, nextFree());
-        }
-        return symbolToPrettyType.get(t.name)!;
-      }
       default:
         return assertNever(t);
     }
