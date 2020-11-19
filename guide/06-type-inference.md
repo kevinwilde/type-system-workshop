@@ -37,3 +37,11 @@ Once we have assigned types and generated constraints in the form of "Type A mus
 - given the constraint "`(Listof T2)` must match `(Listof int)`" we can verify that these are both `TyList` so there is no contradiction and can deduce a new constraint "`T2` must match `int`".
 - given the constraint "`(-> int T3)` must match `(-> T4 T5)`" we can verify that these are both `TyArrow` and have one argument so there is no contradiction and can deduce two new constraints "`int` must match `T4`" and "`T3` must match `T5`".
 - given the constraint "`bool` must match `int`" we fail because this is a contradiction.
+
+### Visual example
+
+TODO insert link here
+
+### Implementation hints
+
+- This is a depth-first tree traversal. Although looking at the example might give the impression that it will require a lot of effort to build the tree or attach types to nodes in the tree, that will not be the case in our implementation. Depth-first traversals can be accomplished quite elegantly with recursion.
