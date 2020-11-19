@@ -9,12 +9,12 @@ In our current implementation, it is not possible to write a function whose argu
 - `cdr` is a function which takes a list of `X`s and returns a new list excluding the first item. Ex. `(cdr (cons 1 (cons 2 empty))) -> (cons 2 empty)`, `(cdr (cons "hi" (cons "bye" empty))) -> (cons "bye" empty)`
 - `empty?` is a function which takes a list of `X`s and returns a boolean indicating whether the list is empty or not. Ex. `(empty? (cons 2 empty)) -> #f`, `(empty? empty) -> #t`
 
+### Solutions for difficulties with Lists
+
 What we need is some sort of polymorphism.
 
 > "Type systems that allow a single piece of code to be used with multiple types
 > are collectively known as polymorphic systems" (Pierce 340).
-
-### Approaches
 
 - _Parametric polymorphism_: think of generics in Java or TypeScript. Ex. `car<T>(List<T> list): T` takes a list of elements of type `T` and returns a type `T`. You "instantiate" the type variable with a concrete type at the place where you call this function.
 - _Ad-hoc polymorphism_: most common example is "overloading" -- when a single function name is associated with multiple implementations that each have a different type signature and the compiler (or runtime system) chooses which implementation to call based on the types of the arguments you pass
@@ -40,6 +40,8 @@ This defines a recursive factorial function, and then tries to call it with `5`.
 3. determine the type of the body of the let expression using the updated Context
 
 The problem we run into is in step 1. At this point, the name `factorial` is not in the Context yet, since we haven't yet determined its type. So in our current implementation, it looks like the call to `(factorial (- n 1))` in the value of the let expression is referencing some undefined variable `factorial`.
+
+### A solution
 
 There are a variety of ways to approach this issue, but one way we could solve it is by adding `factorial` to the Context before step 1, with some "to be determined" type. Unfortunately, we don't currently have a way to represent a "to be determined" type.
 
@@ -70,8 +72,6 @@ The typechecker would correctly reject this program:
 
 ```
 ...<same as above>...
-  (and
-    (list-contains (cons 1 (cons 2 empty)) 2)
     (list-contains (cons "hello" (cons "world" empty)) 3)))
 ```
 
