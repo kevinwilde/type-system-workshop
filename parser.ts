@@ -8,10 +8,14 @@ export type Term = (
   | { tag: "TmStr"; val: string }
   | { tag: "TmVar"; name: string }
   | { tag: "TmIf"; cond: Term; then: Term; else: Term }
-  // | { tag: "TmEmpty" }
-  // | { tag: "TmCons"; car: Term; cdr: Term }
+  | { tag: "TmEmpty" }
+  | { tag: "TmCons"; car: Term; cdr: Term }
   | { tag: "TmLet"; name: string; val: Term; body: Term }
-  | { tag: "TmAbs"; params: { name: string; typeAnn: Type }[]; body: Term }
+  | {
+    tag: "TmAbs";
+    params: { name: string; typeAnn: Type | null }[];
+    body: Term;
+  }
   | { tag: "TmApp"; func: Term; args: Term[] }
 );
 
@@ -34,6 +38,8 @@ export function createAST(lexer: Lexer): Term {
       return { tag: "TmInt", val: cur.val };
     case "STR":
       return { tag: "TmStr", val: cur.val };
+    case "EMPTY":
+      return { tag: "TmEmpty" };
     case "IDEN":
       return { tag: "TmVar", name: cur.name };
     case "LPAREN": {
@@ -56,6 +62,7 @@ function parseParenBody(lexer: Lexer): Term {
     case "BOOL":
     case "INT":
     case "STR":
+    case "EMPTY":
       throw new Error(`Unexpected token: ${nextToken.tag}`);
     case "LAMBDA": {
       lexer.consumeToken("LAMBDA");
@@ -118,8 +125,11 @@ function parseFunctionParams(lexer: Lexer) {
   const params = [];
   while (lexer.peek() && lexer.peek()?.tag !== "RPAREN") {
     const iden = lexer.consumeToken("IDEN");
-    lexer.consumeToken("COLON");
-    const typeAnn = parseTypeAnn(lexer);
+    let typeAnn: Type | null = null;
+    if (lexer.peek() && lexer.peek()?.tag === "COLON") {
+      lexer.consumeToken("COLON");
+      typeAnn = parseTypeAnn(lexer);
+    }
     params.push({ name: iden.name, typeAnn });
   }
   lexer.consumeToken("RPAREN");
@@ -140,6 +150,7 @@ function parseTypeAnn(lexer: Lexer): Type {
     case "AND":
     case "OR":
     case "LAMBDA":
+    case "EMPTY":
     case "INT":
     case "BOOL":
     case "STR":
@@ -157,20 +168,30 @@ function parseTypeAnn(lexer: Lexer): Type {
       }
     }
     case "LPAREN": {
-      lexer.consumeToken("ARROW");
-      const funcTypes = [];
-      while (lexer.peek() && lexer.peek()?.tag !== "RPAREN") {
-        funcTypes.push(parseTypeAnn(lexer));
+      const next = lexer.peek();
+      if (next && next.tag === "IDEN" && next.name === "Listof") {
+        lexer.consumeToken("IDEN");
+        const elementType = parseTypeAnn(lexer);
+        lexer.consumeToken("RPAREN");
+        return { tag: "TyList", elementType };
+      } else if (next && next.tag === "ARROW") {
+        lexer.consumeToken("ARROW");
+        const funcTypes = [];
+        while (lexer.peek() && lexer.peek()?.tag !== "RPAREN") {
+          funcTypes.push(parseTypeAnn(lexer));
+        }
+        lexer.consumeToken("RPAREN");
+        if (funcTypes.length === 0) {
+          throw new Error(
+            `Unexpected token: expected function return type but got RPAREN`,
+          );
+        }
+        const paramTypes = funcTypes.slice(0, funcTypes.length - 1);
+        const returnType = funcTypes[funcTypes.length - 1];
+        return { tag: "TyArrow", paramTypes, returnType };
+      } else {
+        throw new Error(next ? `Unexpected token: ${next.tag}` : "eof");
       }
-      lexer.consumeToken("RPAREN");
-      if (funcTypes.length === 0) {
-        throw new Error(
-          `Unexpected token: expected function return type but got RPAREN`,
-        );
-      }
-      const paramTypes = funcTypes.slice(0, funcTypes.length - 1);
-      const returnType = funcTypes[funcTypes.length - 1];
-      return { tag: "TyArrow", paramTypes, returnType };
     }
     default:
       return assertNever(cur);

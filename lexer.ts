@@ -10,7 +10,7 @@ type Token =
   | { tag: "AND" }
   | { tag: "OR" }
   | { tag: "LAMBDA" }
-  // | { tag: "EMPTY" }
+  | { tag: "EMPTY" }
   | { tag: "BOOL"; val: boolean }
   | { tag: "INT"; val: number }
   | { tag: "STR"; val: string }
@@ -126,6 +126,8 @@ export class Lexer {
           return { tag: "OR" };
         case "lambda":
           return { tag: "LAMBDA" };
+        case "empty":
+          return { tag: "EMPTY" };
         case "#t":
           return { tag: "BOOL", val: true };
         case "#f":

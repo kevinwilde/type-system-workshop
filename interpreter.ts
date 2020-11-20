@@ -12,8 +12,8 @@ export type Value =
   | { tag: "TmBool"; val: boolean }
   | { tag: "TmInt"; val: number }
   | { tag: "TmStr"; val: string }
-  // | { tag: "TmEmpty" }
-  // | { tag: "TmCons"; car: Value; cdr: Value }
+  | { tag: "TmEmpty" }
+  | { tag: "TmCons"; car: Value; cdr: Value }
   | { tag: "TmClosure"; params: string[]; body: Term; env: Environment }
   | { tag: "TmStdlibFun"; impl: (...args: Value[]) => Value };
 
@@ -32,6 +32,15 @@ function interpretInEnv(term: Term, env: Environment): Value {
       };
     case "TmVar":
       return lookupInEnv(term.name, env);
+    case "TmEmpty": {
+      return term;
+    }
+    case "TmCons":
+      return {
+        tag: "TmCons",
+        car: interpretInEnv(term.car, env),
+        cdr: interpretInEnv(term.cdr, env),
+      };
     case "TmIf": {
       const condResult = interpretInEnv(term.cond, env);
       if (condResult.tag !== "TmBool") {

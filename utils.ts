@@ -52,6 +52,10 @@ export function printValue(v: ReturnType<typeof evaluate>): string {
       return `${v.val}`;
     case "TmStr":
       return `"${v.val}"`;
+    case "TmEmpty":
+      return `empty`;
+    case "TmCons":
+      return `(cons ${printValue(v.car)} ${printValue(v.cdr)})`;
     case "TmClosure":
       return `[CLOSURE]`; // TODO ?
     case "TmStdlibFun":
@@ -91,10 +95,18 @@ export function printType(t: ReturnType<typeof typeCheck>) {
         return "int";
       case "TyStr":
         return "str";
+      case "TyList":
+        return `(Listof ${helper(t.elementType)})`;
       case "TyArrow":
         return `(-> ${(t.paramTypes.map((p) => helper(p))).join(" ")} ${
           helper(t.returnType)
         })`;
+      case "TyTbd": {
+        if (!(symbolToPrettyType.has(t.sym))) {
+          symbolToPrettyType.set(t.sym, nextFree());
+        }
+        return symbolToPrettyType.get(t.sym)!;
+      }
       default:
         return assertNever(t);
     }
