@@ -1,3 +1,5 @@
+import { DiscriminateUnion } from "./utils.ts";
+
 type Token =
   | { tag: "LPAREN" }
   | { tag: "RPAREN" }
@@ -32,6 +34,24 @@ export class Lexer {
       this.i = endIdx;
     }
     return result;
+  }
+
+  public consumeToken<T extends Token["tag"]>(
+    expected: T,
+  ): DiscriminateUnion<Token, "tag", T> {
+    const token = this.nextToken();
+    if (token === null) {
+      throw new Error("eof");
+    }
+    function assertToken(t: Token): t is DiscriminateUnion<Token, "tag", T> {
+      return t.tag === expected;
+    }
+    if (!assertToken(token)) {
+      throw new Error(
+        `Unexpected token: expected ${expected} but got ${token.tag}`,
+      );
+    }
+    return token;
   }
 
   private calculateNextToken(): [Token | null, number] {

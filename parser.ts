@@ -55,101 +55,49 @@ export function createAST(lexer: Lexer): Term {
               `Unexpected token: ${nextToken.tag}`,
             );
           case "LAMBDA": {
-            const lambda_ = lexer.nextToken();
+            lexer.consumeToken("LAMBDA");
             const params = parseFunctionParams(lexer);
             const body = createAST(lexer);
-            const closeParen = lexer.nextToken();
-            if (closeParen === null) {
-              throw new Error("eof");
-            }
-            if (closeParen.tag !== "RPAREN") {
-              throw new Error(
-                `Unexpected token: expected \`)\` but got ${closeParen.tag}`,
-              );
-            }
+            lexer.consumeToken("RPAREN");
             return { tag: "TmAbs", params, body };
           }
           case "LET": {
-            const let_ = lexer.nextToken();
-            if (let_ === null) {
-              throw new Error("eof");
-            }
-            const varName = lexer.nextToken();
-            if (varName === null) {
-              throw new Error("eof");
-            }
-            if (varName.tag !== "IDEN") {
-              throw new Error(
-                "Unexpected token: Expected a variable name to bind let expression to",
-              );
-            }
+            lexer.consumeToken("LET");
+            const varName = lexer.consumeToken("IDEN");
             const val = createAST(lexer);
             const body = createAST(lexer);
-            const closeParen = lexer.nextToken();
-            if (closeParen === null) {
-              throw new Error("eof");
-            }
-            if (closeParen.tag !== "RPAREN") {
-              throw new Error(
-                `Unexpected token: expected \`)\` but got ${closeParen.tag}`,
-              );
-            }
-
+            lexer.consumeToken("RPAREN");
             return { tag: "TmLet", name: varName.name, val, body };
           }
           case "IF": {
-            const if_ = lexer.nextToken();
+            lexer.consumeToken("IF");
             const cond = createAST(lexer);
             const then = createAST(lexer);
             const else_ = createAST(lexer);
-            const closeParen = lexer.nextToken();
-            if (closeParen === null) {
-              throw new Error("eof");
-            }
-            if (closeParen.tag !== "RPAREN") {
-              throw new Error(
-                `Unexpected token: expected \`)\` but got ${closeParen.tag}`,
-              );
-            }
+            lexer.consumeToken("RPAREN");
             return { tag: "TmIf", cond, then, else: else_ };
           }
           case "AND": {
-            const and_ = lexer.nextToken();
+            lexer.consumeToken("AND");
             const cond1 = createAST(lexer);
             const cond2 = createAST(lexer);
-            const closeParen = lexer.nextToken();
-            if (closeParen === null) {
-              throw new Error("eof");
-            }
-            if (closeParen.tag !== "RPAREN") {
-              throw new Error(
-                `Unexpected token: expected \`)\` but got ${closeParen.tag}`,
-              );
-            }
+            lexer.consumeToken("RPAREN");
             return {
               tag: "TmIf",
               cond: cond1,
               then: cond2,
-              else: cond1,
+              else: { tag: "TmBool", val: false },
             };
           }
           case "OR": {
-            const or_ = lexer.nextToken();
+            lexer.consumeToken("OR");
             const cond1 = createAST(lexer);
             const cond2 = createAST(lexer);
-            const closeParen = lexer.nextToken();
-            if (closeParen === null) {
-              throw new Error("eof");
-            }
-            if (closeParen.tag !== "RPAREN") {
-              throw new Error(
-                `Unexpected token: expected \`)\` but got ${closeParen.tag}`,
-              );
-            }
+            lexer.consumeToken("RPAREN");
             return {
               tag: "TmIf",
               cond: cond1,
-              then: cond1,
+              then: { tag: "TmBool", val: true },
               else: cond2,
             };
           }
@@ -162,7 +110,7 @@ export function createAST(lexer: Lexer): Term {
               if (next === null) {
                 throw new Error("eof");
               } else if (next.tag === "RPAREN") {
-                let closeParen_ = lexer.nextToken();
+                lexer.consumeToken("RPAREN");
                 return { tag: "TmApp", func, args };
               } else {
                 args.push(createAST(lexer));
@@ -186,40 +134,16 @@ export function createAST(lexer: Lexer): Term {
 }
 
 function parseFunctionParams(lexer: Lexer) {
-  const paramsOpenParen = lexer.nextToken();
-  if (paramsOpenParen === null) {
-    throw new Error("eof");
-  }
-  if (paramsOpenParen.tag !== "LPAREN") {
-    throw new Error(
-      `Unexpected token: expected \`(\` but got ${paramsOpenParen.tag}`,
-    );
-  }
-
+  lexer.consumeToken("LPAREN");
   const params = [];
-  while (true) {
-    const next = lexer.nextToken();
-    if (!next) {
-      throw new Error("eof");
-    } else if (next.tag === "RPAREN") {
-      return params;
-    } else if (next.tag === "IDEN") {
-      if (!lexer.peek() || lexer.peek()?.tag !== "COLON") {
-        throw new Error(
-          `Unexpected token: expected \`:\` but got ${lexer.peek()
-            ?.tag}`,
-        );
-      }
-      const colon = lexer.nextToken();
-      if (colon === null || colon.tag !== "COLON") {
-        throw new Error();
-      }
-      const typeAnn = parseTypeAnn(lexer);
-      params.push({ name: next.name, typeAnn });
-    } else {
-      throw new Error(`Unexpected token: ${next.tag}`);
-    }
+  while (lexer.peek() && lexer.peek()?.tag !== "RPAREN") {
+    const iden = lexer.consumeToken("IDEN");
+    lexer.consumeToken("COLON");
+    const typeAnn = parseTypeAnn(lexer);
+    params.push({ name: iden.name, typeAnn });
   }
+  lexer.consumeToken("RPAREN");
+  return params;
 }
 
 function parseTypeAnn(lexer: Lexer): Type {
@@ -253,36 +177,20 @@ function parseTypeAnn(lexer: Lexer): Type {
       }
     }
     case "LPAREN": {
-      const next = lexer.nextToken();
-      if (next === null) {
-        throw new Error("eof");
-      } else if (next.tag === "ARROW") {
-        const funcTypes = [];
-        while (lexer.peek() && lexer.peek()?.tag !== "RPAREN") {
-          funcTypes.push(parseTypeAnn(lexer));
-        }
-        const rparen_ = lexer.nextToken();
-        if (rparen_ === null) {
-          throw new Error("eof");
-        }
-        if (rparen_.tag !== "RPAREN") {
-          throw new Error(
-            `Unexpected token: expected \`)\` but got ${rparen_.tag}`,
-          );
-        }
-        if (funcTypes.length === 0) {
-          throw new Error(
-            `Unexpected token: expected function return type but got \`)\``,
-          );
-        }
-        const paramTypes = funcTypes.slice(0, funcTypes.length - 1);
-        const returnType = funcTypes[funcTypes.length - 1];
-        return { tag: "TyArrow", paramTypes, returnType };
-      } else {
+      lexer.consumeToken("ARROW");
+      const funcTypes = [];
+      while (lexer.peek() && lexer.peek()?.tag !== "RPAREN") {
+        funcTypes.push(parseTypeAnn(lexer));
+      }
+      lexer.consumeToken("RPAREN");
+      if (funcTypes.length === 0) {
         throw new Error(
-          `Unexpected token: ${next.tag}`,
+          `Unexpected token: expected function return type but got RPAREN`,
         );
       }
+      const paramTypes = funcTypes.slice(0, funcTypes.length - 1);
+      const returnType = funcTypes[funcTypes.length - 1];
+      return { tag: "TyArrow", paramTypes, returnType };
     }
     default:
       return assertNever(cur);
