@@ -60,10 +60,6 @@ export class Lexer {
       // Handle parens
       char += input[j];
       j++;
-    } else if (input[j] === "[" || input[j] === "]") {
-      // Handle square brackets
-      char += input[j];
-      j++;
     } else if (input[j] === ":") {
       // Handle colon
       char += input[j];
@@ -79,10 +75,9 @@ export class Lexer {
       // chars which signal end of token:
       // - whitespace
       // - parens
-      // - square brackets
       // - colon
       // don't need arrow since it can only come after paren when used in type ann
-      while (j < input.length && !/(\s|\(|\)|\[|\]|\:)/.test(input[j])) {
+      while (j < input.length && !/(\s|\(|\)|\:)/.test(input[j])) {
         char += input[j];
         j++;
       }
