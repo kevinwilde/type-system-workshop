@@ -56,55 +56,18 @@ export function createAST(lexer: Lexer): Term {
             );
           case "LAMBDA": {
             const lambda_ = lexer.nextToken();
-            const paramsOpenParen = lexer.nextToken();
-            if (paramsOpenParen === null) {
+            const params = parseFunctionParams(lexer);
+            const body = createAST(lexer);
+            const closeParen = lexer.nextToken();
+            if (closeParen === null) {
               throw new Error("eof");
             }
-            switch (paramsOpenParen.tag) {
-              case "LPAREN": {
-                const params = [];
-                while (true) {
-                  const next = lexer.nextToken();
-                  if (!next) {
-                    throw new Error("eof");
-                  } else if (next.tag === "RPAREN") {
-                    break;
-                  } else if (next.tag === "IDEN") {
-                    if (!lexer.peek() || lexer.peek()?.tag !== "COLON") {
-                      throw new Error(
-                        `Unexpected token: expected \`:\` but got ${lexer.peek()
-                          ?.tag}`,
-                      );
-                    }
-                    const colon = lexer.nextToken();
-                    if (colon === null || colon.tag !== "COLON") {
-                      throw new Error();
-                    }
-                    const typeAnn = parseTypeAnn(lexer);
-                    params.push({ name: next.name, typeAnn });
-                  } else {
-                    throw new Error(
-                      `Unexpected token: ${next.tag}`,
-                    );
-                  }
-                }
-                const body = createAST(lexer);
-                const closeParen = lexer.nextToken();
-                if (closeParen === null) {
-                  throw new Error("eof");
-                }
-                if (closeParen.tag !== "RPAREN") {
-                  throw new Error(
-                    `Unexpected token: expected \`)\` but got ${closeParen.tag}`,
-                  );
-                }
-                return { tag: "TmAbs", params, body };
-              }
-              default:
-                throw new Error(
-                  `Unexpected token: expected \`(\` but got ${paramsOpenParen.tag}`,
-                );
+            if (closeParen.tag !== "RPAREN") {
+              throw new Error(
+                `Unexpected token: expected \`)\` but got ${closeParen.tag}`,
+              );
             }
+            return { tag: "TmAbs", params, body };
           }
           case "LET": {
             const let_ = lexer.nextToken();
@@ -220,6 +183,43 @@ export function createAST(lexer: Lexer): Term {
     throw new Error("eof");
   }
   return result;
+}
+
+function parseFunctionParams(lexer: Lexer) {
+  const paramsOpenParen = lexer.nextToken();
+  if (paramsOpenParen === null) {
+    throw new Error("eof");
+  }
+  if (paramsOpenParen.tag !== "LPAREN") {
+    throw new Error(
+      `Unexpected token: expected \`(\` but got ${paramsOpenParen.tag}`,
+    );
+  }
+
+  const params = [];
+  while (true) {
+    const next = lexer.nextToken();
+    if (!next) {
+      throw new Error("eof");
+    } else if (next.tag === "RPAREN") {
+      return params;
+    } else if (next.tag === "IDEN") {
+      if (!lexer.peek() || lexer.peek()?.tag !== "COLON") {
+        throw new Error(
+          `Unexpected token: expected \`:\` but got ${lexer.peek()
+            ?.tag}`,
+        );
+      }
+      const colon = lexer.nextToken();
+      if (colon === null || colon.tag !== "COLON") {
+        throw new Error();
+      }
+      const typeAnn = parseTypeAnn(lexer);
+      params.push({ name: next.name, typeAnn });
+    } else {
+      throw new Error(`Unexpected token: ${next.tag}`);
+    }
+  }
 }
 
 function parseTypeAnn(lexer: Lexer): Type {
