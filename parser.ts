@@ -16,121 +16,101 @@ export type Term = (
 );
 
 export function createAST(lexer: Lexer): Term {
-  function getNextTerm(): Term | null {
-    const cur = lexer.nextToken();
-    if (!cur) {
-      throw new Error("eof");
+  const cur = lexer.nextToken();
+  if (!cur) throw new Error("eof");
+  switch (cur.tag) {
+    case "RPAREN":
+    case "COLON":
+    case "ARROW":
+    case "LET":
+    case "IF":
+    case "AND":
+    case "OR":
+    case "LAMBDA":
+      throw new Error(`Unexpected token: ${cur.tag}`);
+    case "BOOL":
+      return { tag: "TmBool", val: cur.val };
+    case "INT":
+      return { tag: "TmInt", val: cur.val };
+    case "STR":
+      return { tag: "TmStr", val: cur.val };
+    case "IDEN":
+      return { tag: "TmVar", name: cur.name };
+    case "LPAREN": {
+      const body = parseParenBody(lexer);
+      lexer.consumeToken("RPAREN");
+      return body;
     }
+    default:
+      return assertNever(cur);
+  }
+}
 
-    switch (cur.tag) {
-      case "RPAREN":
-      case "COLON":
-      case "ARROW":
-      case "LET":
-      case "IF":
-      case "AND":
-      case "OR":
-      case "LAMBDA":
-        throw new Error(`Unexpected token: ${cur.tag}`);
-      case "BOOL":
-        return { tag: "TmBool", val: cur.val };
-      case "INT":
-        return { tag: "TmInt", val: cur.val };
-      case "STR":
-        return { tag: "TmStr", val: cur.val };
-      case "IDEN": {
-        return { tag: "TmVar", name: cur.name };
-      }
-      case "LPAREN": {
-        let nextToken = lexer.peek();
-        if (!nextToken) throw new Error("eof");
-        switch (nextToken.tag) {
-          case "RPAREN":
-          case "COLON":
-          case "ARROW":
-          case "BOOL":
-          case "INT":
-          case "STR":
-            throw new Error(
-              `Unexpected token: ${nextToken.tag}`,
-            );
-          case "LAMBDA": {
-            lexer.consumeToken("LAMBDA");
-            const params = parseFunctionParams(lexer);
-            const body = createAST(lexer);
-            lexer.consumeToken("RPAREN");
-            return { tag: "TmAbs", params, body };
-          }
-          case "LET": {
-            lexer.consumeToken("LET");
-            const varName = lexer.consumeToken("IDEN");
-            const val = createAST(lexer);
-            const body = createAST(lexer);
-            lexer.consumeToken("RPAREN");
-            return { tag: "TmLet", name: varName.name, val, body };
-          }
-          case "IF": {
-            lexer.consumeToken("IF");
-            const cond = createAST(lexer);
-            const then = createAST(lexer);
-            const else_ = createAST(lexer);
-            lexer.consumeToken("RPAREN");
-            return { tag: "TmIf", cond, then, else: else_ };
-          }
-          case "AND": {
-            lexer.consumeToken("AND");
-            const cond1 = createAST(lexer);
-            const cond2 = createAST(lexer);
-            lexer.consumeToken("RPAREN");
-            return {
-              tag: "TmIf",
-              cond: cond1,
-              then: cond2,
-              else: { tag: "TmBool", val: false },
-            };
-          }
-          case "OR": {
-            lexer.consumeToken("OR");
-            const cond1 = createAST(lexer);
-            const cond2 = createAST(lexer);
-            lexer.consumeToken("RPAREN");
-            return {
-              tag: "TmIf",
-              cond: cond1,
-              then: { tag: "TmBool", val: true },
-              else: cond2,
-            };
-          }
-          case "LPAREN":
-          case "IDEN": {
-            const func = createAST(lexer);
-            const args = [];
-            while (true) {
-              const next = lexer.peek();
-              if (next === null) {
-                throw new Error("eof");
-              } else if (next.tag === "RPAREN") {
-                lexer.consumeToken("RPAREN");
-                return { tag: "TmApp", func, args };
-              } else {
-                args.push(createAST(lexer));
-              }
-            }
-          }
-          default:
-            return assertNever(nextToken);
-        }
-      }
-      default:
-        return assertNever(cur);
+function parseParenBody(lexer: Lexer): Term {
+  let nextToken = lexer.peek();
+  if (!nextToken) throw new Error("eof");
+  switch (nextToken.tag) {
+    case "RPAREN":
+    case "COLON":
+    case "ARROW":
+    case "BOOL":
+    case "INT":
+    case "STR":
+      throw new Error(`Unexpected token: ${nextToken.tag}`);
+    case "LAMBDA": {
+      lexer.consumeToken("LAMBDA");
+      const params = parseFunctionParams(lexer);
+      const body = createAST(lexer);
+      return { tag: "TmAbs", params, body };
     }
+    case "LET": {
+      lexer.consumeToken("LET");
+      const varName = lexer.consumeToken("IDEN");
+      const val = createAST(lexer);
+      const body = createAST(lexer);
+      return { tag: "TmLet", name: varName.name, val, body };
+    }
+    case "IF": {
+      lexer.consumeToken("IF");
+      const condTerm = createAST(lexer);
+      const thenTerm = createAST(lexer);
+      const elseTerm = createAST(lexer);
+      return { tag: "TmIf", cond: condTerm, then: thenTerm, else: elseTerm };
+    }
+    case "AND": {
+      lexer.consumeToken("AND");
+      const cond1 = createAST(lexer);
+      const cond2 = createAST(lexer);
+      return {
+        tag: "TmIf",
+        cond: cond1,
+        then: cond2,
+        else: { tag: "TmBool", val: false },
+      };
+    }
+    case "OR": {
+      lexer.consumeToken("OR");
+      const cond1 = createAST(lexer);
+      const cond2 = createAST(lexer);
+      return {
+        tag: "TmIf",
+        cond: cond1,
+        then: { tag: "TmBool", val: true },
+        else: cond2,
+      };
+    }
+    case "LPAREN":
+    case "IDEN": {
+      const func = createAST(lexer);
+      const args = [];
+      while (lexer.peek() && lexer.peek()?.tag !== "RPAREN") {
+        args.push(createAST(lexer));
+      }
+      return { tag: "TmApp", func, args };
+    }
+    default:
+      return assertNever(nextToken);
   }
-
-  const result = getNextTerm();
-  if (!result) {
-    throw new Error("eof");
-  }
-  return result;
 }
 
 function parseFunctionParams(lexer: Lexer) {
