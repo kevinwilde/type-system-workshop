@@ -165,6 +165,13 @@ Deno.test("[TypeError] calling a function with multiple args", () => {
   expectTypeError(program);
 });
 
+Deno.test("[TypeError] calling a function with wrong number of args", () => {
+  let program = " ((lambda (x:bool y:bool) x) #t)";
+  expectTypeError(program);
+  program = " ((lambda (x:bool y:bool) x) #t #f #t)";
+  expectTypeError(program);
+});
+
 Deno.test("conditionals (with type ann)", () => {
   let program = "((lambda (x:bool y:int z:int) (if x y z)) #t 1 2)";
   assertType(program, "int");
