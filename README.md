@@ -8,6 +8,20 @@
 
 3. Clone this repo
 
+## Commands
+
+Run tests:
+
+```
+deno test test/tests.ts
+```
+
+Run a source file:
+
+```
+deno run  --allow-read index.ts <path/to/file>
+```
+
 ## References
 
 The syntax of our language is mostly based on racket.
