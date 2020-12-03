@@ -24,7 +24,8 @@ function printErrorTestCase(program: string) {
     console.log((evaluate(ast)));
     throw new Error("Program didn't error");
   } catch (e) {
-    console.log(e.stack);
+    // console.log(e.stack);
+    console.log("Pass", e.message);
   }
   console.log("=========================================================");
 }
