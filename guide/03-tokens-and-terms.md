@@ -32,14 +32,14 @@ Our parser will consume the (flat) sequence of tokens produced by the lexer and 
 
 ```typescript
 type Term =
+  | { tag: "TmBool"; val: boolean }
   | { tag: "TmInt"; val: number }
   | { tag: "TmStr"; val: string }
-  | { tag: "TmBool"; val: boolean }
   | { tag: "TmVar"; name: string }
-  | { tag: "TmEmpty" }
-  | { tag: "TmCons"; car: Term; cdr: Term }
   | { tag: "TmIf"; cond: Term; then: Term; else: Term }
   | { tag: "TmLet"; name: string; val: Term; body: Term }
+  | { tag: "TmEmpty" }
+  | { tag: "TmCons"; car: Term; cdr: Term }
   | {
       tag: "TmAbs";
       params: { name: string; typeAnn: Type }[];
@@ -59,15 +59,15 @@ Notice how this corresponds almost one-to-one with the grammar we defined:
 
 ```
 <expression> =
+  | <boolean>
   | <int>
   | <string>
-  | <boolean>
   | <id>
-  | empty
   | (and <expression> <expression>)
   | (or <expression> <expression>)
-  | (cons <expression> <expression>)
   | (if <expression> <expression> <expression>)
+  | empty
+  | (cons <expression> <expression>)
   | (let <id> <expression> <expression>)
   | (lambda (<id>:<type> ...) <expression>)
   | (<expression> <expression> ...)
