@@ -50,7 +50,7 @@ function expectTypeError(program: string) {
   console.log("Actual result:");
   console.log(prettyPrint(res));
   console.log(`Expected type error`);
-  throw new Error("Test failed");
+  throw new Error("Test failed: expected type error but got none");
 }
 
 Deno.test("defining a variable (int)", () => {
@@ -179,12 +179,18 @@ Deno.test("conditionals (with type ann)", () => {
   program = "((lambda (x:bool y:int z:int) (if x y z)) #f 1 2)";
   assertType(program, "int");
   assertResult(program, `2`);
+  program =
+    "((lambda (x:bool fn1:(-> int int int) fn2:(-> int int int)) (if x fn1 fn2)) #f + -)";
+  assertType(program, "(-> int int int)");
 });
 
 Deno.test("[TypeError] conditionals (with type ann)", () => {
   let program = "((lambda (x: bool y: int z : int) (if x y z)) 1 2 3)";
   expectTypeError(program);
   program = `((lambda (x: bool y :int z:int) (if x y z)) #f 1 "hi")`;
+  expectTypeError(program);
+  program =
+    "((lambda (x:bool fn1:(-> int int int) fn2:(-> int int int)) (if x fn1 fn2)) #f + string-concat)";
   expectTypeError(program);
 });
 
