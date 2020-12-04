@@ -111,31 +111,6 @@ Deno.test("=", () => {
   program = "(= 2 3)";
   assertType(program, "bool");
   assertResult(program, `#f`);
-
-  // program = "([= bool] #f #f)";
-  // assertType(program, "bool");
-  // assertResult(program, `#t`);
-  // program = "([= bool] #f #t)";
-  // assertType(program, "bool");
-  // assertResult(program, `#f`);
-
-  // program = `([= str] "hi" "hi")`;
-  // assertType(program, "bool");
-  // assertResult(program, `#t`);
-  // program = `([= str] "hi" "bye")`;
-  // assertType(program, "bool");
-  // assertResult(program, `#f`);
-
-  // program = "([= (Listof str)] empty:str empty:str)";
-  // assertType(program, "bool");
-  // assertResult(program, `#t`);
-  // program =
-  //   "([= (Listof int)] ([cons int] 2 empty:int) ([cons int] 2 empty:int))";
-  // assertType(program, "bool");
-  // assertResult(program, `#f`);
-  // program = "(let x ([cons int] 2 empty:int) ([= (Listof int)] x x))";
-  // assertType(program, "bool");
-  // assertResult(program, `#t`);
 });
 
 Deno.test("calling a function (with type ann)", () => {
@@ -235,15 +210,6 @@ Deno.test("string-length", () => {
   assertType(program, `int`);
   assertResult(program, `5`);
 });
-
-// Deno.test("string->list", () => {
-//   let program = `(string->list "hello")`;
-//   assertType(program, `(Listof str)`);
-//   assertResult(
-//     program,
-//     `(cons "h" (cons "e" (cons "l" (cons "l" (cons "o" empty)))))`,
-//   );
-// });
 
 Deno.test("string-concat", () => {
   let program = `(let x (string-concat "hello" "world") x)`;
@@ -401,6 +367,7 @@ Deno.test("[TypeError] first class functions (with type ann)", () => {
   expectTypeError(program);
 });
 
+//// Recursive functions
 // Deno.test("naive factorial (with type ann)", () => {
 //   const g = `
 //     (lambda (n: int)
@@ -409,8 +376,6 @@ Deno.test("[TypeError] first class functions (with type ann)", () => {
 //           (* n (factorial (- n 1)))))
 //   `;
 //   let program = `(let factorial ${g} factorial)`;
-//   let ast = createAST(new Lexer(program));
-//   console.log(prettyPrint(ast));
 //   assertType(program, `(-> int int)`);
 //   // program = `(let factorial ${g} (factorial 0))`;
 //   // assertResult(program, `1`);
@@ -481,7 +446,7 @@ Deno.test("[TypeError] first class functions (with type ann)", () => {
 //     (let smart-fib
 //       (lambda (n: int)
 //           (let helper
-//             (lambda (i prev1 prev2)
+//             (lambda (i: int prev1: int prev2: int)
 //                     (if (= i n)
 //                         prev2
 //                         (helper (+ i 1) (+ prev1 prev2) prev1)))
@@ -505,114 +470,4 @@ Deno.test("[TypeError] first class functions (with type ann)", () => {
 //   assertResult(program, `12586269025`);
 //   program = fib(`"hi"` as any);
 //   expectTypeError(program);
-// });
-
-// Deno.test("defining a variable (list)", () => {
-//   let program = `(let x (cons-int 1 (cons-int 2 (cons-int 3 empty:int))) x)`;
-//   assertType(program, `(Listof int)`);
-//   assertResult(program, `(cons-int 1 (cons-int 2 (cons-int 3 empty)))`);
-// });
-
-// Deno.test("[TypeError] defining a variable (list)", () => {
-//   let program = `(let x (cons-int 1 (cons-int "hi" (cons-int 3 empty:int))) x)`;
-//   expectTypeError(program);
-// });
-
-// Deno.test("accessing car of list", () => {
-//   let program = `(car-int (cons-int 1 (cons-int 2 empty:int)))`;
-//   assertType(program, `int`);
-//   assertResult(program, `1`);
-// });
-
-// Deno.test("accessing cdr of list", () => {
-//   let program = `(cdr (cons 1 (cons 2 empty:int)))`;
-//   assertType(program, `(Listof int)`);
-//   assertResult(program, `(cons 2 empty)`);
-//   program = `(cdr (cdr (cons 1 (cons 2 empty:int))))`;
-//   assertType(program, `(Listof int)`);
-//   assertResult(program, `empty`);
-// });
-
-// Deno.test("defining a function that takes a list (with type ann)", () => {
-//   let program = "(lambda (x:(Listof int)) x)";
-//   assertType(program, "(-> (Listof int) (Listof int))");
-//   program = `(lambda (x:(Listof int)) (car x))`;
-//   assertType(program, "(-> (Listof int) int)");
-//   program = `(lambda (x:(Listof int)) (cdr x))`;
-//   assertType(program, "(-> (Listof int) (Listof int))");
-//   program = `(lambda (x:(Listof int)) (+ 1 (car x)))`;
-//   assertType(program, "(-> (Listof int) int)");
-// });
-
-// Deno.test("calling a function that takes a list (with type ann)", () => {
-//   let program = "((lambda (x:(Listof int)) x) (cons 1 (cons 2 empty)))";
-//   assertType(program, "(Listof int)");
-//   assertResult(program, `(cons 1 (cons 2 empty))`);
-//   program = `((lambda (x:(Listof int)) (car x)) (cons 1 (cons 2 empty)))`;
-//   assertType(program, "int");
-//   assertResult(program, `1`);
-//   program = `((lambda (x:(Listof int)) (cdr x)) (cons 1 (cons 2 empty)))`;
-//   assertType(program, `(Listof int)`);
-//   assertResult(program, `(cons 2 empty)`);
-//   program =
-//     `((lambda (x:(Listof int)) (+ 41 (car x))) (cons 1 (cons 2 empty)))`;
-//   assertType(program, "int");
-//   assertResult(program, `42`);
-// });
-
-// Deno.test("[TypeError] calling a function that takes a list (with type ann)", () => {
-//   let program = `((lambda (x:(Listof int)) x) (cons "hi" (cons "bye" empty)))`;
-//   expectTypeError(program);
-//   program =
-//     `((lambda (x:(Listof int)) (string-concat (car x) "world")) (cons 1 (cons 2 empty)))`;
-//   expectTypeError(program);
-// });
-
-// // Deno.test("hamming distance", () => {
-// //   let program = (str1: string, str2: string) => (`
-// //     (let hamming-distance (lambda (s1 s2)
-// //       (if (not (= (string-length s1) (string-length s2)))
-// //           -1
-// //           (let helper
-// //             (lambda (l1 l2 acc)
-// //               (if (empty? l1)
-// //                   acc
-// //                   (helper (cdr l1) (cdr l2) (if (= (car l1) (car l2)) acc (+ acc 1)))))
-// //             (helper (string->list s1) (string->list s2) 0))))
-// //       (hamming-distance "${str1}" "${str2}"))
-// //   `);
-// //   assertType(program("", ""), `int`);
-// //   assertResult(program("", ""), `0`);
-// //   assertResult(program("a", ""), `-1`);
-// //   assertResult(program("a", "a"), `0`);
-// //   assertResult(program("a", "b"), `1`);
-// //   assertResult(program("ACCAGGG", "ACTATGG"), `2`);
-// //   assertResult(program("hellothere", "yellowhair"), `5`);
-// // });
-
-// Deno.test("list contains", () => {
-//   let program = `
-//     (let list-contains
-//       (lambda (lst:(Listof int) val: int)
-//         (if (empty? lst)
-//             #f
-//             (if (= (car lst) val)
-//                 #t
-//                 (list-contains (cdr lst) val))))
-//       (list-contains (cons 1 empty) 2))
-//   `;
-//   assertType(program, `bool`);
-//   assertResult(program, `#f`);
-//   program = `
-//     (let list-contains
-//       (lambda (lst val)
-//         (if (empty? lst)
-//             #f
-//             (if (= (car lst) val)
-//                 #t
-//                 (list-contains (cdr lst) val))))
-//       (list-contains (cons 1 (cons 2 empty)) 2))
-//   `;
-//   assertType(program, `bool`);
-//   assertResult(program, `#t`);
 // });
