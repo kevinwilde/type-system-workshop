@@ -26,7 +26,7 @@ Note: ... signifies zero or more of the item which precedes it
   | int
   | str
   | (Listof <type>)
-  | (-> (<type> ...) <type>)
+  | (-> <type> ... <type>)
 ```
 
 Although this is the complete grammar, there are additional rules that the type system will enforce. For example:
