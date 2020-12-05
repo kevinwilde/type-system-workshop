@@ -8,9 +8,9 @@ The grammar for our language will be:
 Note: ... signifies zero or more of the item which precedes it
 
 <expression> =
-  | <boolean>
+  | <bool>
   | <int>
-  | <string>
+  | <str>
   | <id>
   | (and <expression> <expression>)
   | (or <expression> <expression>)
