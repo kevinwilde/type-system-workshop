@@ -6,13 +6,13 @@ export type Term = (
   | { tag: "TmBool"; val: boolean }
   | { tag: "TmInt"; val: number }
   | { tag: "TmStr"; val: string }
-  // | { tag: "TmEmpty" }
-  // | { tag: "TmCons"; car: Term; cdr: Term }
   | { tag: "TmVar"; name: string }
   | { tag: "TmIf"; cond: Term; then: Term; else: Term }
+  // | { tag: "TmEmpty" }
+  // | { tag: "TmCons"; car: Term; cdr: Term }
+  | { tag: "TmLet"; name: string; val: Term; body: Term }
   | { tag: "TmAbs"; params: { name: string; typeAnn: Type }[]; body: Term }
   | { tag: "TmApp"; func: Term; args: Term[] }
-  | { tag: "TmLet"; name: string; val: Term; body: Term }
 );
 
 export function createAST(lexer: Lexer): Term {
