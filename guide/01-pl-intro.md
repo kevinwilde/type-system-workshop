@@ -1,16 +1,5 @@
 # Programming Language Implementation Intro
 
-We are building a statically typed, interpreted programming language. Its type system will also be strongly typed and structural. This can be contrasted with real programming languages:
-
-| Language   | Static/Dynamic | Strong/Weak | Compiled/Interpreted | Nominal/Structural |
-| ---------- | -------------- | ----------- | -------------------- | ------------------ |
-| Python     | Dynamic        | Strong      | Interpreted          | -                  |
-| JavaScript | Dynamic        | Weak        | Interpreted          | -                  |
-| C          | Static         | Weak        | Compiled             | Nominal            |
-| Java       | Static         | Strong      | Neither/Both?        | Nominal            |
-| Go         | Static         | Strong      | Compiled             | Structural         |
-| Typescript | Static         | Mixed?      | Compiled             | Structural         |
-
 The programming language we are creating consists of the following pieces:
 
 1. Lexer
