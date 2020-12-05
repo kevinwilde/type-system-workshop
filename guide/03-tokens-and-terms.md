@@ -81,9 +81,11 @@ and
 
 `(or expr1 expr2)` is equivalent to `(if expr1 #t expr2)`
 
-> Side note: The evaluation semantics of `and` and `or` where the second expression is only evaluated when necessary is also the reason why `and` and `or` cannot be implemented as functions in the standard library. Arguments to functions are all evaluated before the body of the function. More on this when we talk about the interpreter.
+> Side note: The evaluation semantics of `and` and `or` where the second expression is only evaluated when necessary is also the reason why `and` and `or` cannot be implemented as functions in the standard library. Arguments to functions are all evaluated before the body of the function, which would mean that both expressions would always be evaluated if `and` and `or` were functions.
 
-This allows us to provide more convenient semantics to the programmer without increasing the complexity of our typechecker or interpreter since they are unaware of `and` and `or` expressions. A less obvious example is that we could also eliminate the `"TmLet"` term since `let` expressions can be translated into an equivalent "TmApp" expression. However, TODO explain why we might choose to not do this
+This allows us to provide more convenient semantics to the programmer without increasing the complexity of our typechecker or interpreter since they are unaware of `and` and `or` expressions.
+
+> A less obvious example is that we could also eliminate the `"TmLet"` term since `let` expressions can be translated into an equivalent "TmApp" expression. `(let x val body)` is semantically equivalent to `((lambda (x:<type>) body) val)`. However, this transformation is not necessarily desirable in a statically typed language as it adds some difficulty for the typechecker. Namely, if the parser is doing this transformation so that the typechecker and interpreter don't need to be aware of let expressions, then the parser must know what type to add for the type annotation. But this information would typically be determined by the typechecker when it calculates the type of `val`. In a language with inference where type annotations are optional, there is still difficulty as let expressions can be used "for generalizing polymorphic definitions to obtain typings that cannot be emulated using ordinary λ-abstraction and application" (Pierce 125).
 
 The fact that `Term` refers to itself in its definition is what will make this a tree. For example, we may have a term like:
 
