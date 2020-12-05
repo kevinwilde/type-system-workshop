@@ -40,7 +40,7 @@ Once we have assigned types and generated constraints in the form of "Type A mus
 
 ### Visual example
 
-TODO insert link here
+https://docs.google.com/presentation/d/1_MlBOa6sGNDq-2Qcv2HHHsLWKJJ2Cvg83DzMRee4Y8A/
 
 ### Implementation hints
 
