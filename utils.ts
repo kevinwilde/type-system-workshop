@@ -39,7 +39,7 @@ export function prettyPrint(obj: any) {
 // export const genUniqTypeVar = Symbol;
 // For debugging...easier to console log than symbols
 let i = 0;
-export const genUniqTypeVar = () => {
+export const genUniqTypeVar = (): symbol => {
   i++;
   return `?X_${i}` as any;
 };
