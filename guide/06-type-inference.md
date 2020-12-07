@@ -44,4 +44,5 @@ https://docs.google.com/presentation/d/1_MlBOa6sGNDq-2Qcv2HHHsLWKJJ2Cvg83DzMRee4
 
 ### Implementation hints
 
+- Stash/commit your changes and check out the branch `03-inference-start-point`
 - This is a depth-first tree traversal. Although looking at the example might give the impression that it will require a lot of effort to build the tree or attach types to nodes in the tree, that will not be the case in our implementation. Depth-first traversals can be accomplished quite elegantly with recursion.
