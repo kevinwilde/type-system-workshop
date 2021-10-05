@@ -1,6 +1,6 @@
 import { Term } from "./parser.ts";
 import { lookupInStdLib } from "./stdlib.ts";
-import { assertNever, genUniqTypeVar } from "./utils.ts";
+import { assertNever, genUniqTypeVar, printType } from "./utils.ts";
 
 export type Type =
   | { tag: "TyBool" }
@@ -8,7 +8,8 @@ export type Type =
   | { tag: "TyStr" }
   | { tag: "TyList"; elementType: Type }
   | { tag: "TyArrow"; paramTypes: Type[]; returnType: Type }
-  | { tag: "TyTbd"; sym: symbol };
+  | { tag: "TyTbd"; sym: symbol }
+  | { tag: "TyScheme", freeVars: symbol[]; type: Type };
 
 type Context = { name: string; type: Type }[];
 
@@ -17,9 +18,11 @@ type Constraints = Constraint[];
 
 export function typeCheck(term: Term) {
   const [type, constraints] = getTypeAndConstraints(term, []);
+  // console.log(type, JSON.stringify(constraints, null , 2))
   const unifiedConstraints = unify(constraints);
+  // console.log(JSON.stringify(unifiedConstraints, null, 2))
   const finalType = applySubst(unifiedConstraints, type);
-  return finalType;
+  return reduceTypeScheme(finalType);
 }
 
 function getTypeAndConstraints(term: Term, ctx: Context): [Type, Constraints] {
@@ -74,10 +77,22 @@ function getTypeAndConstraints(term: Term, ctx: Context): [Type, Constraints] {
           ...ctx,
         ],
       );
+      const principalValType = applySubst(unify(constr1), valType)
+      // console.log(printType(principalValType))
 
       const [bodyType, constr2] = getTypeAndConstraints(
         term.body,
-        [{ name: term.name, type: valType }, ...ctx],
+        [
+          {
+            name: term.name,
+            type: {
+              tag: "TyScheme",
+              type: principalValType,
+              freeVars: [...new Set(collectSymbolsNotInContext(principalValType, ctx))],
+            }
+          },
+          ...ctx
+        ],
       );
 
       return [
@@ -85,7 +100,7 @@ function getTypeAndConstraints(term: Term, ctx: Context): [Type, Constraints] {
         [
           // Constraint that the TBD-type we referenced above matches the
           // type determined for the value of the let expression
-          [tbdTypeForRecursion, valType],
+          [tbdTypeForRecursion, principalValType],
           ...constr1,
           ...constr2,
         ],
@@ -168,6 +183,24 @@ function unify(constraints: Constraints): Constraints {
       [ty1, ty2],
       ...unify(substituteInConstraints(ty1.sym, ty2, restConstraints)),
     ];
+  } if (ty1.tag === "TyScheme" && ty2.tag === "TyScheme") {
+    const newConstraint: Constraints[0] = [
+      refreshTbdTypes(ty1.type, ty1.freeVars),
+      refreshTbdTypes(ty2.type, ty2.freeVars),
+    ];
+    return unify([newConstraint, ...restConstraints]);
+  } else if (ty2.tag === "TyScheme") {
+    const newConstraint: Constraints[0] = [
+      ty1,
+      refreshTbdTypes(ty2.type, ty2.freeVars),
+    ];
+    return unify([newConstraint, ...restConstraints]);
+  } else if (ty1.tag === "TyScheme") {
+    const newConstraint: Constraints[0] = [
+      refreshTbdTypes(ty1.type, ty1.freeVars),
+      ty2,
+    ];
+    return unify([newConstraint, ...restConstraints]);
   } else if (ty1.tag === ty2.tag) {
     switch (ty1.tag) {
       case "TyBool":
@@ -234,6 +267,8 @@ function occursIn(sym: symbol, otherType: Type): boolean {
         occursIn(sym, otherType.returnType);
     case "TyTbd":
       return otherType.sym === sym;
+    case "TyScheme":
+      return occursIn(sym, otherType.type)
     default:
       return assertNever(otherType);
   }
@@ -296,9 +331,127 @@ function substituteInType(
         return typeToSubstInsideOf;
       }
     }
+    case "TyScheme": {
+      return {
+        tag: "TyScheme",
+        type: substituteInType(sym, knownType, typeToSubstInsideOf.type),
+        freeVars: typeToSubstInsideOf.freeVars,
+      }
+    }
     default:
       return assertNever(typeToSubstInsideOf);
   }
+}
+
+function collectSymbolsNotInContext(type: Type, ctx: Context): symbol[] {
+  switch(type.tag) {
+    case "TyBool":
+    case "TyInt":
+    case "TyStr":
+      return [];
+    case "TyList":
+      return collectSymbolsNotInContext(type.elementType, ctx)
+    case "TyArrow":
+      return [...type.paramTypes.map((p) => collectSymbolsNotInContext(p, ctx)).flat(), ...collectSymbolsNotInContext(type.returnType, ctx)]
+    case "TyTbd": {
+      if (ctx.find((t) => t.type.tag === "TyTbd" && t.type.sym === type.sym)) {
+        return []
+      } else {
+        return [type.sym]
+      }
+    }
+    case "TyScheme":
+      return collectSymbolsNotInContext(type.type, ctx)
+    default:
+      return assertNever(type)
+  }
+}
+
+function reduceTypeScheme(type: Type): Type {
+  switch(type.tag) {
+    case "TyBool":
+    case "TyInt":
+    case "TyStr":
+      return type
+    case "TyList":
+      return {
+        tag: "TyList",
+        elementType: reduceTypeScheme(type.elementType),
+      }
+    case "TyArrow":
+      return {
+        tag: "TyArrow",
+        paramTypes: type.paramTypes.map((p) => reduceTypeScheme(p)),
+        returnType: reduceTypeScheme(type.returnType),
+      }
+    case "TyTbd":
+      return type
+    case "TyScheme":
+      return reduceTypeScheme(type.type)
+    default:
+      return assertNever(type)
+  }
+}
+
+// TODO make work correctly
+// - need to make sure that when you have the same sym multiple times
+//   within a type, it is refreshed consistently (i.e. with only 1
+//   new sym).
+// - need to make sure you don't refresh a type which is also mentioned
+//   in context
+function refreshTbdTypes(type: Type, freeVars: symbol[]): Type {
+  const alreadyRefreshed = new Map<symbol, symbol>()
+  function helper(type: Type, freeVars: symbol[]): Type {
+    switch(type.tag) {
+      case "TyBool":
+      case "TyInt":
+      case "TyStr":
+        return type;
+      case "TyList":
+        return {
+          tag: "TyList",
+          elementType: helper(type.elementType, freeVars)
+        }
+      case "TyArrow":
+        return {
+          tag: "TyArrow",
+          paramTypes: type.paramTypes.map((p) => helper(p, freeVars)),
+          returnType: helper(type.returnType, freeVars),
+        };
+      case "TyTbd":{
+        // console.log('here!!!', freeVars)
+        if (alreadyRefreshed.has(type.sym)) {
+          return {
+            tag: "TyTbd",
+            sym: alreadyRefreshed.get(type.sym)!,
+          }
+        } else if (freeVars.includes(type.sym)) {
+          const newSym = genUniqTypeVar()
+          alreadyRefreshed.set(type.sym, newSym)
+          return {
+            tag: "TyTbd",
+            sym: newSym,
+          }
+        }
+        return type
+      }
+      case "TyScheme":
+        return {
+          tag: "TyScheme",
+          type: helper(type.type, [...type.freeVars, ...freeVars]),
+          freeVars: [],
+        }
+      default:
+        return assertNever(type)
+    }
+  }
+  // console.log('===================')
+  // console.log('refreshing type')
+  // console.log(JSON.stringify(type, null, 2))
+  const result = helper(type, freeVars)
+  // console.log(JSON.stringify(result, null, 2))
+  // console.log('===================')
+  return result
 }
 
 function applySubst(constraints: Constraints, ty: Type) {

@@ -755,6 +755,42 @@ Deno.test("identity fn", () => {
   assertType(program, "(-> 'a 'a)");
 });
 
+Deno.test({
+  name: "call same function with diff types",
+  only: false,
+  fn: () => {
+  let program = `(let iden (lambda (x) x) (if (= 0 (iden 1)) (iden "hello") (iden "world")))`;
+  assertType(program, "str");
+  assertResult(program, `"world"`)
+}})
+
+Deno.test({
+  name: "call same function with diff types TODO",
+  only: false,
+  fn: () => {
+  let program = `(let iden (lambda (x) x) (string-concat (iden "hello") (iden "world")))`;
+  assertType(program, "str");
+  assertResult(program, `"helloworld"`)
+}})
+
+Deno.test({
+  name: "tricky tricky call same function with diff types",
+  only: false,
+  fn: () => {
+    /*
+    (function(f, x) {
+      let g = f;
+      g(0);
+    })((y) => y ? true : false, true);
+    */
+  let program = `
+    ((lambda (f x) (let g f (g 0)))
+      (lambda (y) (if y #t #f))
+      #t)
+  `;
+  expectTypeError(program);
+}})
+
 Deno.test("type inference on function", () => {
   let program = "(lambda (x y) (if x 0 1))";
   assertType(program, "(-> bool 'a int)");

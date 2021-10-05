@@ -107,6 +107,9 @@ export function printType(t: ReturnType<typeof typeCheck>) {
         }
         return symbolToPrettyType.get(t.sym)!;
       }
+      case "TyScheme":{
+        return `[SCHEME: ${helper(t.type)}]`
+      }
       default:
         return assertNever(t);
     }
